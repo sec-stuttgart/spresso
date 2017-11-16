@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Relying Party</title>
+    <style>
+      html {
+      background-color: #e4e499;
+      }
+      
+      body {
+      margin: 20px;
+      padding: 7px;
+      background-color: #ffffff;
+      border-radius: 10px;
+      font-family: sans-serif;
+      }
+      
+      th {
+      text-align: left;
+      }
+      
+      table td, table th {
+      padding-left: 5px;
+      }
+
+      #log {
+      font-family: "Lucida Console", Monaco, monospace;
+      }
+    </style>
+  </head>
+  <body>
+    <script>
+     "use strict";
+
+     var login_dialog_redirect_url = "/redir";
+     var loginDialog;
+
+     function startLogin() {
+       console.log('startLogin');
+       loginDialog = window.open('/wait', 'loginDialog','width=600,height=400');
+       var email = document.getElementById('email_input').value;
+       var xhr = new XMLHttpRequest();
+       xhr.onload = function (event) {
+	 var response = JSON.parse(this.responseText);
+	 startLoginDialog(
+	   response.tag_key,
+	   response.forwarder_domain,
+	   response.login_session_token
+	 );
+       }
+       xhr.open("POST", '/startLogin', true);
+       xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+       var email_param = encodeURIComponent(email);
+       xhr.send("email=" + email_param);
+     }
+
+     function startLoginDialog(tag_key, forwarder_domain, login_session_token) {
+       var tag_key_handle;
+       var ia_key_handle;
+       var tag_encrypted_json;
+       var tag_iv;
+       var tag_key_base64;
+       var ia_key_base64;
+       var forwarder_origin = 'https://' + forwarder_domain;
+
+       window.addEventListener("message", onProxyIframeTagKeyRequest);
+       loginDialog = window.open(
+	 login_dialog_redirect_url 
+	 + '?login_session_token=' + encodeURIComponent(login_session_token),
+	 'loginDialog','width=600,height=400');
+
+       function onProxyIframeTagKeyRequest(event) {
+	 console.log('received proxy iframe ready', event);
+
+	 if ( event.source != loginDialog.frames[0]) {
+	   throw 'received key request from window that is not the first iframe of the login dialog';
+	 }
+
+	 if ( event.origin != forwarder_origin ) {
+	   throw 'received key request from origin that is not the forwarder origin';
+	 }
+
+	 if ( event.data != 'ready-send-tag-key' ) {
+	   return;
+	 }
+
+	 console.log('send tag key to proxy iframe');	 
+	 window.removeEventListener("message", onProxyIframeTagKeyRequest);
+	 event.source.postMessage(tag_key, forwarder_origin);	 
+	 window.addEventListener("message", onReceiveEncryptedIdentityAssertion);
+
+       }
+
+       function onReceiveEncryptedIdentityAssertion(event) {
+	 console.log('received encrypted identity assertion', event);
+
+	 if ( event.source != loginDialog.frames[0]) {
+	   throw 'received encrypted identity assertion from window that is not the first iframe of the login dialog';
+	 }
+
+	 if ( event.origin != forwarder_origin ) {
+	   throw 'received encrypted identity assertion from origin that is not the forwarder origin';
+	 }
+
+	 window.removeEventListener("message", onReceiveEncryptedIdentityAssertion, false);
+	 loginDialog.close();
+
+	 var eia = event.data;
+	 sendEIA(eia, login_session_token);
+
+       }
+
+     }
+
+     function sendEIA(eia, login_session_token) {
+       var xhr = new XMLHttpRequest();
+       xhr.onload = function (event) {
+	 alert("Congratulations, you are logged in with " + this.responseText + ". Have fun.");
+	 var li = document.createElement("li");
+	 var content = document.createTextNode("Successful login with " + this.responseText + " at " + new Date());
+	 li.appendChild(content);
+	 var log = document.getElementById("log");
+	 log.appendChild(li);
+       }
+       xhr.open("POST", '/login', true);
+       xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");
+       var eia_param = encodeURIComponent(eia);
+       var login_session_token_param = encodeURIComponent(login_session_token);
+       xhr.send("eia=" + eia_param + "&login_session_token=" + login_session_token_param);
+     }
+    </script>
+    <h1>Relying Party</h1>
+    <p><i>Please note that this proof-of-concept only works with one identity provider (idp.spresso.me). There are also no workarounds in place for the broken Internet Explorer postMessage API.</i></p>
+
+    <form onsubmit="startLogin(); return false;">
+      <input id="email_input" type="email" value="alice@idp.spresso.me" pattern="^.*@idp\.spresso\.me$">
+      <button type="submit">Login with SPRESSO</button>
+    </form>
+    <p>
+      Available users for this demo:
+      <table>
+	<tr>
+	  <th>Username</th>
+	  <th>Password</th>
+	</tr>
+	<tr>
+	  <td>alice@idp.spresso.me</td>
+	  <td>alice</td>
+	</tr>
+	<tr>
+	  <td>bob@idp.spresso.me</td>
+	  <td>bob</td>
+	</tr>
+      </table>
+    </p>
+    <ul id="log">
+    </ul>
+  </body>
+</html>

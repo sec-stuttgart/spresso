@@ -1,0 +1,12 @@
+<!DOCTYPE html>
+<!-- 
+This page redirects to the IdP login dialog URL.
+
+The rationale behind using this proxy page is to avoid carrying the referer header in the new request. We create a link with the attribute rel="noreferrer" which avoids the referer header in compliant browsers.
+ -->
+<html>
+    <body onload="document.getElementById('link').click();">
+	<a href="{{ url }}" rel="noreferrer" id="link"></a>
+    </body>
+</html>
+
