@@ -3,10 +3,10 @@
   "idpOrigin": "https://idp.spresso.me",
   "tls": {
     "publicKeyPem": "static/serverkey.pub.pem",
-    "privateKeyPem": "static/serverkey.priv.pem",
+    "privateKeyPem": "static/serverkey.priv.pem"
   },
   "users": {
     "alice@idp.spresso.me": "alice",
-    "bob@idp.spresso.me": "bob",
+    "bob@idp.spresso.me": "bob"
   }
 }
