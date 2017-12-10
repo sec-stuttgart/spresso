@@ -1,0 +1,31 @@
+{
+  "name": "spresso-rp",
+  "version": "0.0.1",
+  "description": "SPRESSO Single Sign-On System - Relaying Party",
+  "main": "rp.js",
+  "dependencies": {
+    "winston": "^3.0.0-rc1",
+    "cookie": "^0.3.1",
+    "htmlencode": "^0.0.4",
+    "https-proxy-agent": "^2.1.0"
+  },
+  "devDependencies": {
+    "eslint": "^4.11.0",
+    "eslint-config-airbnb-base": "^12.1.0",
+    "eslint-plugin-html": "^4.0.1",
+    "eslint-plugin-import": "^2.8.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sec-stuttgart/spresso.git"
+  },
+  "author": "SEC Institut, University of Stuttgart",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/sec-stuttgart/spresso/issues"
+  },
+  "homepage": "https://github.com/sec-stuttgart/spresso#readme"
+}

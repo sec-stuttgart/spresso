@@ -4,145 +4,149 @@
     <title>I'm your Email Provider.</title>
     <style>
       html {
-      background-color: #9999e4;
+        background-color: #9999e4;
       }
       
       body {
-      margin: 20px;
-      padding: 7px;
-      background-color: #ffffff;
-      border-radius: 10px;
-      font-family: sans-serif;
-      padding-bottom: 15px;
+        margin: 20px;
+        padding: 7px;
+        background-color: #ffffff;
+        border-radius: 10px;
+        font-family: sans-serif;
+        padding-bottom: 15px;
       }
-      
     </style>
+
     <script>
-     function arrayBufferToString(buf) {
-       return String.fromCharCode.apply(null, new Uint8Array(buf));
-     }
-     
-     function stringToArrayBuffer(str) {
-       var buf = new ArrayBuffer(str.length);
-       var bufView = new Uint8Array(buf);
-       for (var i=0, strLen=str.length; i < strLen; i++) {
-	 bufView[i] = str.charCodeAt(i);
-       }
-       return buf;
-     }
+      function arrayBufferToString(buf) {
+        return String.fromCharCode.apply(null, new Uint8Array(buf));
+      }
 
-     function base64ToArrayBuffer(base64) {
-       return stringToArrayBuffer(atob(base64));
-     }
+      function stringToArrayBuffer(str) {
+        const buf = new ArrayBuffer(str.length);
+        const bufView = new Uint8Array(buf);
 
-     function arrayBufferToBase64(arrayBuffer) {
-       return btoa(arrayBufferToString(arrayBuffer));
-     }
+        for (let i = 0, strLen = str.length; i < strLen; i += 1) {
+          bufView[i] = str.charCodeAt(i);
+        }
 
-     var algorithm = {name: 'AES-GCM'};
-     var hash = window.location.hash.substring(1);
-     var hash_values = hash.split('&');
-     var tag           = decodeURIComponent(hash_values[0]);
-     var email         = decodeURIComponent(hash_values[1]);
-     var ia_key        = decodeURIComponent(hash_values[2]);
-     var forwarder_domain = decodeURIComponent(hash_values[3]);
-     var forwarder_path = ".well-known/spresso-proxy";
-     var sign_path = "/sign";
+        return buf;
+      }
 
-     var logged_in_as = "{{ email }}";
+      function base64ToArrayBuffer(base64) {
+        return stringToArrayBuffer(atob(base64));
+      }
+
+      function arrayBufferToBase64(arrayBuffer) {
+        return btoa(arrayBufferToString(arrayBuffer));
+      }
+
+      const algorithm = { name: 'AES-GCM' };
+      const hash = window.location.hash.substring(1);
+      const hashValues = hash.split('&');
+      const tag = decodeURIComponent(hashValues[0]);
+      const email = decodeURIComponent(hashValues[1]);
+      const iaKey = decodeURIComponent(hashValues[2]);
+      const forwarderDomain = decodeURIComponent(hashValues[3]);
+      const forwarderPath = '.well-known/spresso-proxy';
+      const signPath = '/sign';
+
+      const loggedInAs = '{{ email }}';
+
+      function createProxyIframe(encryptedIaJson) {
+        const tagParam = encodeURIComponent(tag);
+        const eiaParam = encodeURIComponent(encryptedIaJson);
+        const url = `https://${forwarderDomain}/${forwarderPath}#${tagParam}&${eiaParam}`;
+        const ifrm = document.createElement('IFRAME');
+        ifrm.setAttribute('src', url);
+        ifrm.style.display = 'none';
+        ifrm.style.width = '320px'; // TODO: Make this invisible. Visible for debugging now.
+        ifrm.style.height = '200px';
+        document.body.appendChild(ifrm);
+        console.debug('LD finished.');
+      }
+
+      function encryptIdentityAssertion(iaJson) {
+        const iaKeyArrayBuffer = base64ToArrayBuffer(iaKey);
+        let iv;
 
 
-     function createProxyIframe(encrypted_ia_json) {
-       var tag_param = encodeURIComponent(tag);
-       var eia_param = encodeURIComponent(encrypted_ia_json);
-       var url = "https://" + forwarder_domain + "/" + forwarder_path + "#" + tag_param + "&" + eia_param;
-       ifrm = document.createElement("IFRAME"); 
-       ifrm.setAttribute("src", url); 
-       ifrm.style.display = "none";
-       ifrm.style.width = 320+"px"; // TODO: Make this invisible. Visible for debugging now. 
-       ifrm.style.height = 200+"px"; 
-       document.body.appendChild(ifrm); 
-       console.debug("LD finished.");
-     }
-       
-     function encryptIdentityAssertion(ia_json) {
-       var ia_key_arrayBuffer = base64ToArrayBuffer(ia_key);
-       var iv;
-       
+        function importKey() {
+          return crypto.subtle.importKey('raw', iaKeyArrayBuffer, algorithm, false, ['encrypt']);
+        }
 
-       function importKey() {
-	 return crypto.subtle.importKey("raw", ia_key_arrayBuffer, algorithm, false, ['encrypt']);
-       }
-       
-       function encryptIA(ia_key_handle) {
-	 iv = new Int8Array(12); 
-	 crypto.getRandomValues(iv);
-	 return crypto.subtle.encrypt({ 
-	   name: algorithm.name, 
-	   iv: iv
-	 }, ia_key_handle, stringToArrayBuffer(ia_json));
-       }
+        function encryptIA(iaKeyHandle) {
+          iv = new Int8Array(12);
+          crypto.getRandomValues(iv);
+          return crypto.subtle.encrypt(
+            { name: algorithm.name, iv },
+            iaKeyHandle,
+            stringToArrayBuffer(iaJson),
+          );
+        }
 
-       function sendEIAToProxy(encrypted_ia_arrayBuffer){
-	 var encrypted_ia_json = JSON.stringify({
-	   'ciphertext': arrayBufferToBase64(encrypted_ia_arrayBuffer),
-	   'iv': arrayBufferToBase64(iv)
-	 });
-	 createProxyIframe(encrypted_ia_json);
-       }
+        function sendEIAToProxy(encryptedIaArrayBuffer) {
+          const encryptedIaJson = JSON.stringify({
+            ciphertext: arrayBufferToBase64(encryptedIaArrayBuffer),
+            iv: arrayBufferToBase64(iv),
+          });
+          createProxyIframe(encryptedIaJson);
+        }
 
-       importKey()
-	      .then(encryptIA, function (x) { console.log("Error importing key!", x); })
-	      .then(sendEIAToProxy, function (x) { console.log("Error encrypting IA!", x); });
-     }	
+        importKey()
+          .then(encryptIA, (x) => { console.log('Error importing key!', x); })
+          .then(sendEIAToProxy, (x) => { console.log('Error encrypting IA!', x); });
+      }
 
-     function getIdentityAssertion() {
-       console.log("LD started.");
-       var password = document.getElementById("password").value;
-       xhr = new XMLHttpRequest();
-       xhr.onload = function (event) {
-	 if (this.status != 200) {
-	   if (password != "") {
-	     alert('server responded: ' + this.responseText);
-	   }
-	   document.getElementById('loginform').style.display = 'initial';
-	   document.getElementById('password').focus();
-	   return;
-	 }
-	 encryptIdentityAssertion(this.responseText);
-       }
-       xhr.open("POST", sign_path, true);
-       xhr.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
-       var password_param = encodeURIComponent(password);
-       var tag_param = encodeURIComponent(tag);
-       var email_param = encodeURIComponent(email);
-       xhr.send("password=" + password_param + "&email=" + email_param + "&tag=" + tag_param + "&forwarder_domain=" + forwarder_domain);
-     }
-     
-     
-     window.onload = function () {
-       // Set email address in form field, only for cosmetical reasons.
-       document.getElementById('email').appendChild(
-	 document.createTextNode(email)
-       );
+      function getIdentityAssertion() {
+        console.log('LD started.');
+        const password = document.getElementById('password').value;
 
-       if (email === logged_in_as) {
-	 getIdentityAssertion();
-	 return;
-       }
-       document.getElementById('loginform').style.display = 'initial';
-       document.getElementById('password').focus();
-     }
+        const xhr = new XMLHttpRequest();
+        xhr.onload = (event) => {
+          if (this.status !== 200) {
+            if (password !== '') {
+              alert(`server responded: ${event} | ${this.responseText}`);
+            }
+            document.getElementById('loginform').style.display = 'initial';
+            document.getElementById('password').focus();
+            return;
+          }
+          encryptIdentityAssertion(this.responseText);
+        };
 
+        xhr.open('POST', signPath, true);
+        xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+
+        const passwordParam = encodeURIComponent(password);
+        const tagParam = encodeURIComponent(tag);
+        const emailParam = encodeURIComponent(email);
+        xhr.send(`password=${passwordParam}&email=${emailParam}&tag=${tagParam}&forwarderDomain=${forwarderDomain}`);
+      }
+
+
+      window.onload = () => {
+        // Set email address in form field, only for cosmetical reasons.
+        document.getElementById('email').appendChild(document.createTextNode(email));
+
+        if (email === loggedInAs) {
+          getIdentityAssertion();
+          return;
+        }
+
+        document.getElementById('loginform').style.display = 'initial';
+        document.getElementById('password').focus();
+      };
     </script>
+
   </head>
   <body>
     <h1>Email Provider</h1>
     <p>Please provide your data to log in at RP.</p>
-    <form id='loginform' onsubmit="getIdentityAssertion(); return false;" style="display:none;">
-      Email Address: <span id="email"></span><br>
-      Password: <input type="password" id="password" /><br>
-      <button type="submit">Log In</button>
+    <form id='loginform' onsubmit='getIdentityAssertion(); return false;' style='display:none;'>
+      Email Address: <span id='email'></span><br>
+      Password: <input type='password' id='password' /><br>
+      <button type='submit'>Log In</button>
     </form>
   </body>
 </html>

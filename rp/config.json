@@ -1,0 +1,6 @@
+{
+  "listenPort": 9996,
+  "rpOrigin": "https://rp.spresso.me",
+  "forwarderDomain": "fwd.spresso.me",
+  "httpProxy": ""
+}

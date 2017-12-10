@@ -4,137 +4,141 @@
     <title>Relying Party</title>
     <style>
       html {
-      background-color: #e4e499;
+        background-color: #e4e499;
       }
       
       body {
-      margin: 20px;
-      padding: 7px;
-      background-color: #ffffff;
-      border-radius: 10px;
-      font-family: sans-serif;
+        margin: 20px;
+        padding: 7px;
+        background-color: #ffffff;
+        border-radius: 10px;
+        font-family: sans-serif;
       }
       
       th {
-      text-align: left;
+        text-align: left;
       }
       
       table td, table th {
-      padding-left: 5px;
+        padding-left: 5px;
       }
 
       #log {
-      font-family: "Lucida Console", Monaco, monospace;
+        font-family: 'Lucida Console', Monaco, monospace;
       }
     </style>
   </head>
   <body>
     <script>
-     "use strict";
+    const loginDialogRedirectUrl = '/redir';
+    let loginDialog;
 
-     var login_dialog_redirect_url = "/redir";
-     var loginDialog;
+    function sendEIA(eia, loginSessionToken) {
+      const xhr = new XMLHttpRequest();
 
-     function startLogin() {
-       console.log('startLogin');
-       loginDialog = window.open('/wait', 'loginDialog','width=600,height=400');
-       var email = document.getElementById('email_input').value;
-       var xhr = new XMLHttpRequest();
-       xhr.onload = function (event) {
-	 var response = JSON.parse(this.responseText);
-	 startLoginDialog(
-	   response.tag_key,
-	   response.forwarder_domain,
-	   response.login_session_token
-	 );
-       }
-       xhr.open("POST", '/startLogin', true);
-       xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");
-       var email_param = encodeURIComponent(email);
-       xhr.send("email=" + email_param);
-     }
+      xhr.onload = (event) => {
+        alert(`Congratulations, you are logged in with ${this.responseText}. Have fun.`);
+        const li = document.createElement('li');
+        const content = document.createTextNode(`Successful login with ${this.responseText} at ${new Date()}`);
+        li.appendChild(content);
+        const log = document.getElementById('log');
+        log.appendChild(li);
+      };
 
-     function startLoginDialog(tag_key, forwarder_domain, login_session_token) {
-       var tag_key_handle;
-       var ia_key_handle;
-       var tag_encrypted_json;
-       var tag_iv;
-       var tag_key_base64;
-       var ia_key_base64;
-       var forwarder_origin = 'https://' + forwarder_domain;
+      xhr.open('POST', '/login', true);
+      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      const eiaParam = encodeURIComponent(eia);
+      const loginSessionTokenParam = encodeURIComponent(loginSessionToken);
+      xhr.send(`eia=${eiaParam}&loginSessionToken=${loginSessionTokenParam}`);
+    }
 
-       window.addEventListener("message", onProxyIframeTagKeyRequest);
-       loginDialog = window.open(
-	 login_dialog_redirect_url 
-	 + '?login_session_token=' + encodeURIComponent(login_session_token),
-	 'loginDialog','width=600,height=400');
 
-       function onProxyIframeTagKeyRequest(event) {
-	 console.log('received proxy iframe ready', event);
+    function startLoginDialog(tagKey, forwarderDomain, loginSessionToken) {
+      // let tagKeyHandle;
+      // let iaKeyHandle;
+      // let tag_encrypted_json;
+      // let tag_iv;
+      // let tagKey_base64;
+      // let ia_key_base64;
+      const forwarderOrigin = `https://${forwarderDomain}`;
 
-	 if ( event.source != loginDialog.frames[0]) {
-	   throw 'received key request from window that is not the first iframe of the login dialog';
-	 }
 
-	 if ( event.origin != forwarder_origin ) {
-	   throw 'received key request from origin that is not the forwarder origin';
-	 }
+      function onReceiveEncryptedIdentityAssertion(event) {
+        console.log('received encrypted identity assertion', event);
 
-	 if ( event.data != 'ready-send-tag-key' ) {
-	   return;
-	 }
+        if (event.source !== loginDialog.frames[0]) {
+          throw new Error('received encrypted identity assertion from window that is not the first iframe of the login dialog');
+        }
 
-	 console.log('send tag key to proxy iframe');	 
-	 window.removeEventListener("message", onProxyIframeTagKeyRequest);
-	 event.source.postMessage(tag_key, forwarder_origin);	 
-	 window.addEventListener("message", onReceiveEncryptedIdentityAssertion);
+        if (event.origin !== forwarderOrigin) {
+          throw new Error('received encrypted identity assertion from origin that is not the forwarder origin');
+        }
 
-       }
+        window.removeEventListener('message', onReceiveEncryptedIdentityAssertion, false);
+        loginDialog.close();
 
-       function onReceiveEncryptedIdentityAssertion(event) {
-	 console.log('received encrypted identity assertion', event);
+        const eia = event.data;
+        sendEIA(eia, loginSessionToken);
+      }
 
-	 if ( event.source != loginDialog.frames[0]) {
-	   throw 'received encrypted identity assertion from window that is not the first iframe of the login dialog';
-	 }
 
-	 if ( event.origin != forwarder_origin ) {
-	   throw 'received encrypted identity assertion from origin that is not the forwarder origin';
-	 }
+      function onProxyIframeTagKeyRequest(event) {
+        console.log('received proxy iframe ready', event);
 
-	 window.removeEventListener("message", onReceiveEncryptedIdentityAssertion, false);
-	 loginDialog.close();
+        if (event.source !== loginDialog.frames[0]) {
+          throw new Error('received key request from window that is not the first iframe of the login dialog');
+        }
 
-	 var eia = event.data;
-	 sendEIA(eia, login_session_token);
+        if (event.origin !== forwarderOrigin) {
+          throw new Error('received key request from origin that is not the forwarder origin');
+        }
 
-       }
+        if (event.data !== 'ready-send-tag-key') {
+          return;
+        }
 
-     }
+        console.log('send tag key to proxy iframe');
+        window.removeEventListener('message', onProxyIframeTagKeyRequest);
+        event.source.postMessage(tagKey, forwarderOrigin);
+        window.addEventListener('message', onReceiveEncryptedIdentityAssertion);
+      }
 
-     function sendEIA(eia, login_session_token) {
-       var xhr = new XMLHttpRequest();
-       xhr.onload = function (event) {
-	 alert("Congratulations, you are logged in with " + this.responseText + ". Have fun.");
-	 var li = document.createElement("li");
-	 var content = document.createTextNode("Successful login with " + this.responseText + " at " + new Date());
-	 li.appendChild(content);
-	 var log = document.getElementById("log");
-	 log.appendChild(li);
-       }
-       xhr.open("POST", '/login', true);
-       xhr.setRequestHeader("Content-type","application/x-www-form-urlencoded");
-       var eia_param = encodeURIComponent(eia);
-       var login_session_token_param = encodeURIComponent(login_session_token);
-       xhr.send("eia=" + eia_param + "&login_session_token=" + login_session_token_param);
-     }
+      window.addEventListener('message', onProxyIframeTagKeyRequest);
+
+      loginDialog = window.open(
+        `${loginDialogRedirectUrl}?loginSessionToken=${encodeURIComponent(loginSessionToken)}`,
+        'loginDialog',
+        'width=600,height=400',
+      );
+    }
+    
+    
+    function startLogin() {
+      console.log('startLogin');
+      loginDialog = window.open('/wait', 'loginDialog', 'width=600,height=400');
+      const email = document.getElementById('email_input').value;
+      const xhr = new XMLHttpRequest();
+
+      xhr.onload = (event) => {
+        const response = JSON.parse(this.responseText);
+        startLoginDialog(
+          response.tagKey,
+          response.forwarderDomain,
+          response.loginSessionToken,
+        );
+      };
+      xhr.open('POST', '/startLogin', true);
+      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      const emailParam = encodeURIComponent(email);
+      xhr.send(`email=${emailParam}`);
+    }
     </script>
     <h1>Relying Party</h1>
     <p><i>Please note that this proof-of-concept only works with one identity provider (idp.spresso.me). There are also no workarounds in place for the broken Internet Explorer postMessage API.</i></p>
 
-    <form onsubmit="startLogin(); return false;">
-      <input id="email_input" type="email" value="alice@idp.spresso.me" pattern="^.*@idp\.spresso\.me$">
-      <button type="submit">Login with SPRESSO</button>
+    <form onsubmit='startLogin(); return false;'>
+      <input id='email_input' type='email' value='alice@idp.spresso.me' pattern='^.*@idp\.spresso\.me$'>
+      <button type='submit'>Login with SPRESSO</button>
     </form>
     <p>
       Available users for this demo:
@@ -153,7 +157,7 @@
 	</tr>
       </table>
     </p>
-    <ul id="log">
+    <ul id='log'>
     </ul>
   </body>
 </html>
