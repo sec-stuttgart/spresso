@@ -39,7 +39,7 @@ const logger = createLogger({
 
 
 // use proxy if given
-const proxy = config.httpProxy || process.env.config.httpProxy;
+const proxy = config.httpProxy || process.env.httpProxy;
 const agent = proxy ? new HttpsProxyAgent(proxy) : null;
 
 
@@ -112,7 +112,7 @@ function serveStartLogin(req, res) {
         const tagKey = createNonce(32);
         const tagIv = createNonce(12);
 
-        const tag = JSON.stringify({ rpNonce, config.rpOrigin });
+        const tag = JSON.stringify({ rpNonce, rpOrigin: config.rpOrigin });
 
         const cipher = crypto.createCipheriv('aes-256-gcm', Buffer(tagKey, 'base64'), Buffer(tagIv, 'base64'));
         const ciphertext = Buffer.concat([cipher.update(tag, 'ascii'), cipher.final(), cipher.getAuthTag()]);
@@ -129,7 +129,7 @@ function serveStartLogin(req, res) {
           ld_path: `https://${domain}${spressoLoginPath}`,
         };
 
-        const response = JSON.stringify({ config.forwarderDomain, loginSessionToken, tagKey });
+        const response = JSON.stringify({ forwarderDomain: config.forwarderDomain, loginSessionToken, tagKey });
 
         res.writeHead(200, {
           'Content-Type': 'application/json',
@@ -207,14 +207,14 @@ function serveLogin(req, res) {
     decipher.setAuthTag(ciphertext.slice(-16));
     const _ia = decipher.update(ciphertext.slice(0, -16));
     const _ia2 = decipher.final();
-    const ia_json = _ia.toString('ascii') + _ia2.toString('ascii');
-    logger.debug('ia_json', ia_json);
-    const ia = JSON.parse(ia_json);
+    const iaJson = _ia.toString('ascii') + _ia2.toString('ascii');
+    logger.debug('iaJson', iaJson);
+    const ia = JSON.parse(iaJson);
 
     const expectedSigned = {
       tag: loginSession.tagEnc,
       email: loginSession.email,
-      config.forwarderDomain,
+      forwarderDomain: config.forwarderDomain,
     };
 
     const expectedSignedJson = JSON.stringify(expectedSigned);
