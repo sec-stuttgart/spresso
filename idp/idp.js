@@ -91,13 +91,11 @@ function getSession(req) {
   return sessions[sessionId];
 }
 
-
 function serve404(req, res) {
   res.writeHead(404);
   res.write('Not found.');
   res.end();
 }
-
 
 function serveSign(req, res) {
   if (req.method !== 'POST') {
@@ -115,6 +113,7 @@ function serveSign(req, res) {
     body += data;
     if (body.length > 1e6) { req.connection.destroy(); }
   });
+
   req.on('end', () => {
     const post = qs.parse(body);
     // const cookies = getCookies(req);

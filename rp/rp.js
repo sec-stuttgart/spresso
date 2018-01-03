@@ -112,7 +112,7 @@ function serveStartLogin(req, res) {
         const tagKey = createNonce(32);
         const tagIv = createNonce(12);
 
-        const tag = JSON.stringify({ rpNonce, rpOrigin: config.rpOrigin });
+        const tag = JSON.stringify({ rpNonce, rp_origin: config.rpOrigin });
 
         const cipher = crypto.createCipheriv('aes-256-gcm', Buffer(tagKey, 'base64'), Buffer(tagIv, 'base64'));
         const ciphertext = Buffer.concat([cipher.update(tag, 'ascii'), cipher.final(), cipher.getAuthTag()]);
@@ -129,7 +129,7 @@ function serveStartLogin(req, res) {
           ld_path: `https://${domain}${spressoLoginPath}`,
         };
 
-        const response = JSON.stringify({ forwarderDomain: config.forwarderDomain, loginSessionToken, tagKey });
+        const response = JSON.stringify({ forwarder_domain: config.forwarderDomain, login_session_token: loginSessionToken, tag_key: tagKey });
 
         res.writeHead(200, {
           'Content-Type': 'application/json',
@@ -144,7 +144,7 @@ function serveStartLogin(req, res) {
 
 function serveRedir(req, res) {
   const urlParts = url.parse(req.url, true);
-  const { loginSessionToken } = urlParts.query;
+  const loginSessionToken = urlParts.query.login_session_token;
 
   if (loginSessions[loginSessionToken] === undefined) {
     serve404(req, res);
@@ -170,11 +170,13 @@ function serveLogin(req, res) {
     serve404(req, res);
     return;
   }
+
   if (req.headers.origin !== undefined && req.headers.origin !== config.rpOrigin) {
     logger.warn('detected XSRF (Origin Header mismatch)');
     serve404(req, res);
     return;
   }
+
 
   let body = '';
   req.on('data', (data) => {
@@ -183,8 +185,7 @@ function serveLogin(req, res) {
   });
   req.on('end', () => {
     const post = qs.parse(body);
-
-    const { loginSessionToken } = post;
+    const loginSessionToken = post.login_session_token;
     if (loginSessions[loginSessionToken] === undefined) {
       serve404(req, res);
       return;
@@ -214,11 +215,10 @@ function serveLogin(req, res) {
     const expectedSigned = {
       tag: loginSession.tagEnc,
       email: loginSession.email,
-      forwarderDomain: config.forwarderDomain,
+      forwarder_domain: config.forwarderDomain,
     };
 
     const expectedSignedJson = JSON.stringify(expectedSigned);
-
     const wk = loginSession.idpWk;
 
     // check ia signature

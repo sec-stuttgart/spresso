@@ -25,11 +25,9 @@
       function stringToArrayBuffer(str) {
         const buf = new ArrayBuffer(str.length);
         const bufView = new Uint8Array(buf);
-
         for (let i = 0, strLen = str.length; i < strLen; i += 1) {
           bufView[i] = str.charCodeAt(i);
         }
-
         return buf;
       }
 
@@ -50,7 +48,6 @@
       const forwarderDomain = decodeURIComponent(hashValues[3]);
       const forwarderPath = '.well-known/spresso-proxy';
       const signPath = '/sign';
-
       const loggedInAs = '{{ email }}';
 
       function createProxyIframe(encryptedIaJson) {
@@ -69,7 +66,6 @@
       function encryptIdentityAssertion(iaJson) {
         const iaKeyArrayBuffer = base64ToArrayBuffer(iaKey);
         let iv;
-
 
         function importKey() {
           return crypto.subtle.importKey('raw', iaKeyArrayBuffer, algorithm, false, ['encrypt']);
@@ -92,7 +88,6 @@
           });
           createProxyIframe(encryptedIaJson);
         }
-
         importKey()
           .then(encryptIA, (x) => { console.log('Error importing key!', x); })
           .then(sendEIAToProxy, (x) => { console.log('Error encrypting IA!', x); });
@@ -101,9 +96,8 @@
       function getIdentityAssertion() {
         console.log('LD started.');
         const password = document.getElementById('password').value;
-
         const xhr = new XMLHttpRequest();
-        xhr.onload = (event) => {
+        xhr.onload = function onloadgetIdentityAssertion(event) {
           if (this.status !== 200) {
             if (password !== '') {
               alert(`server responded: ${event} | ${this.responseText}`);
@@ -114,26 +108,21 @@
           }
           encryptIdentityAssertion(this.responseText);
         };
-
         xhr.open('POST', signPath, true);
         xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-
         const passwordParam = encodeURIComponent(password);
         const tagParam = encodeURIComponent(tag);
         const emailParam = encodeURIComponent(email);
-        xhr.send(`password=${passwordParam}&email=${emailParam}&tag=${tagParam}&forwarderDomain=${forwarderDomain}`);
+        xhr.send(`password=${passwordParam}&email=${emailParam}&tag=${tagParam}&forwarder_domain=${forwarderDomain}`);
       }
 
-
-      window.onload = () => {
+      window.onload = function windowOnloadgetIdentityAssertion(event) {
         // Set email address in form field, only for cosmetical reasons.
         document.getElementById('email').appendChild(document.createTextNode(email));
-
         if (email === loggedInAs) {
           getIdentityAssertion();
           return;
         }
-
         document.getElementById('loginform').style.display = 'initial';
         document.getElementById('password').focus();
       };

@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html>
-  <script>
+<script>
     function arrayBufferToString(buf) {
       return String.fromCharCode.apply(null, new Uint8Array(buf));
     }
@@ -8,11 +8,9 @@
     function stringToArrayBuffer(str) {
       const buf = new ArrayBuffer(str.length);
       const bufView = new Uint8Array(buf);
-
       for (let i = 0, strLen = str.length; i < strLen; i += 1) {
         bufView[i] = str.charCodeAt(i);
       }
-
       return buf;
     }
 
@@ -21,7 +19,6 @@
     }
 
     const algorithm = { name: 'AES-GCM' }; // GCM is important: we need authenticated encryption here!
-
     const hashValues = window.location.hash.substring(1).split('&');
     const tag = decodeURIComponent(hashValues[0]);
     const eia = decodeURIComponent(hashValues[1]);
@@ -30,12 +27,11 @@
       if (event.source !== window.parent.opener) {
         throw new Error('received key from window which is not the opener of the login dialog');
       }
-
       const tagKeyAB = base64ToArrayBuffer(event.data);
 
       function importKey() {
         return crypto.subtle.importKey('raw', tagKeyAB, algorithm, false, ['decrypt']);
-      };
+      }
 
       function decryptTag(tagKey) {
         const tagJson = JSON.parse(tag);
@@ -46,19 +42,16 @@
         );
       }
 
-
       function sendEIA(tagAB) {
         const tagDecrypted = JSON.parse(arrayBufferToString(tagAB));
-
         if (tagDecrypted.rp_origin !== event.origin) {
           throw new Error('received tagKey from origin that does not match the origin contained in the tag');
         }
-
         window.parent.opener.postMessage(eia, event.origin);
       }
-
       importKey().then(decryptTag).then(sendEIA);
     }
+
     window.addEventListener('message', onReceiveTagKey);
     window.parent.opener.postMessage('ready-send-tag-key', '*');
   </script>

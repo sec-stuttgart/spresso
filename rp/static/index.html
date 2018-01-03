@@ -30,131 +30,120 @@
   </head>
   <body>
     <script>
-    const loginDialogRedirectUrl = '/redir';
-    let loginDialog;
+  const loginDialogRedirectUrl = '/redir';
+  let loginDialog;
 
-    function sendEIA(eia, loginSessionToken) {
-      const xhr = new XMLHttpRequest();
+  function sendEIA(eia, loginSessionToken) {
+    console.log('sendEIA', eia, loginSessionToken);
+    const xhr = new XMLHttpRequest();
+    xhr.onload = function onloadSendEIA(event) {
+      console.log('sendEIA xhr.onload', event);
+      alert(`Congratulations, you are logged in with ${this.responseText}. Have fun.`);
+      const li = document.createElement('li');
+      const content = document.createTextNode(`Successful login with ${this.responseText} at ${new Date()}`);
+      li.appendChild(content);
+      const log = document.getElementById('log');
+      log.appendChild(li);
+    };
 
-      xhr.onload = (event) => {
-        alert(`Congratulations, you are logged in with ${this.responseText}. Have fun.`);
-        const li = document.createElement('li');
-        const content = document.createTextNode(`Successful login with ${this.responseText} at ${new Date()}`);
-        li.appendChild(content);
-        const log = document.getElementById('log');
-        log.appendChild(li);
-      };
+    xhr.open('POST', '/login', true);
+    xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    const eiaParam = encodeURIComponent(eia);
+    const loginSessionTokenParam = encodeURIComponent(loginSessionToken);
+    xhr.send(`eia=${eiaParam}&login_session_token=${loginSessionTokenParam}`);
+  }
 
-      xhr.open('POST', '/login', true);
-      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-      const eiaParam = encodeURIComponent(eia);
-      const loginSessionTokenParam = encodeURIComponent(loginSessionToken);
-      xhr.send(`eia=${eiaParam}&loginSessionToken=${loginSessionTokenParam}`);
+  function startLoginDialog(tagKey, forwarderDomain, loginSessionToken) {
+    console.log('startLoginDialog', tagKey, forwarderDomain, loginSessionToken);
+    const forwarderOrigin = `https://${forwarderDomain}`;
+
+    function onReceiveEncryptedIdentityAssertion(event) {
+      console.log('received encrypted identity assertion', event);
+      if (event.source !== loginDialog.frames[0]) {
+        throw new Error('received encrypted identity assertion from window that is not the first iframe of the login dialog');
+      }
+      if (event.origin !== forwarderOrigin) {
+        throw new Error('received encrypted identity assertion from origin that is not the forwarder origin');
+      }
+
+      window.removeEventListener('message', onReceiveEncryptedIdentityAssertion, false);
+      loginDialog.close();
+      const eia = event.data;
+      sendEIA(eia, loginSessionToken);
     }
 
+    function onProxyIframeTagKeyRequest(event) {
+      console.log('received proxy iframe ready', event);
 
-    function startLoginDialog(tagKey, forwarderDomain, loginSessionToken) {
-      // let tagKeyHandle;
-      // let iaKeyHandle;
-      // let tag_encrypted_json;
-      // let tag_iv;
-      // let tagKey_base64;
-      // let ia_key_base64;
-      const forwarderOrigin = `https://${forwarderDomain}`;
-
-
-      function onReceiveEncryptedIdentityAssertion(event) {
-        console.log('received encrypted identity assertion', event);
-
-        if (event.source !== loginDialog.frames[0]) {
-          throw new Error('received encrypted identity assertion from window that is not the first iframe of the login dialog');
-        }
-
-        if (event.origin !== forwarderOrigin) {
-          throw new Error('received encrypted identity assertion from origin that is not the forwarder origin');
-        }
-
-        window.removeEventListener('message', onReceiveEncryptedIdentityAssertion, false);
-        loginDialog.close();
-
-        const eia = event.data;
-        sendEIA(eia, loginSessionToken);
+      if (event.source !== loginDialog.frames[0]) {
+        throw new Error('received key request from window that is not the first iframe of the login dialog');
+      }
+      if (event.origin !== forwarderOrigin) {
+        throw new Error('received key request from origin that is not the forwarder origin');
+      }
+      if (event.data !== 'ready-send-tag-key') {
+        return;
       }
 
+      console.log('send tag key to proxy iframe');
+      window.removeEventListener('message', onProxyIframeTagKeyRequest);
+      event.source.postMessage(tagKey, forwarderOrigin);
+      window.addEventListener('message', onReceiveEncryptedIdentityAssertion);
+    }
 
-      function onProxyIframeTagKeyRequest(event) {
-        console.log('received proxy iframe ready', event);
+    window.addEventListener('message', onProxyIframeTagKeyRequest);
 
-        if (event.source !== loginDialog.frames[0]) {
-          throw new Error('received key request from window that is not the first iframe of the login dialog');
-        }
+    loginDialog = window.open(
+      `${loginDialogRedirectUrl}?login_session_token=${encodeURIComponent(loginSessionToken)}`,
+      'loginDialog',
+      'width=600,height=400',
+    );
+  }
 
-        if (event.origin !== forwarderOrigin) {
-          throw new Error('received key request from origin that is not the forwarder origin');
-        }
+  function startLogin() {
+    console.log('startLogin');
+    loginDialog = window.open('/wait', 'loginDialog', 'width=600,height=400');
+    const email = document.getElementById('email_input').value;
+    const xhr = new XMLHttpRequest();
 
-        if (event.data !== 'ready-send-tag-key') {
-          return;
-        }
-
-        console.log('send tag key to proxy iframe');
-        window.removeEventListener('message', onProxyIframeTagKeyRequest);
-        event.source.postMessage(tagKey, forwarderOrigin);
-        window.addEventListener('message', onReceiveEncryptedIdentityAssertion);
-      }
-
-      window.addEventListener('message', onProxyIframeTagKeyRequest);
-
-      loginDialog = window.open(
-        `${loginDialogRedirectUrl}?loginSessionToken=${encodeURIComponent(loginSessionToken)}`,
-        'loginDialog',
-        'width=600,height=400',
+    xhr.onload = function onloadLoginDialog(event) {
+      console.log('startLogin xhr.onload', event);
+      const response = JSON.parse(this.responseText);
+      startLoginDialog(
+        response.tag_key,
+        response.forwarder_domain,
+        response.login_session_token,
       );
-    }
-    
-    
-    function startLogin() {
-      console.log('startLogin');
-      loginDialog = window.open('/wait', 'loginDialog', 'width=600,height=400');
-      const email = document.getElementById('email_input').value;
-      const xhr = new XMLHttpRequest();
+    };
 
-      xhr.onload = (event) => {
-        const response = JSON.parse(this.responseText);
-        startLoginDialog(
-          response.tagKey,
-          response.forwarderDomain,
-          response.loginSessionToken,
-        );
-      };
-      xhr.open('POST', '/startLogin', true);
-      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-      const emailParam = encodeURIComponent(email);
-      xhr.send(`email=${emailParam}`);
-    }
+    xhr.open('POST', '/startLogin', true);
+    xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+    const emailParam = encodeURIComponent(email);
+    xhr.send(`email=${emailParam}`);
+  }
     </script>
     <h1>Relying Party</h1>
     <p><i>Please note that this proof-of-concept only works with one identity provider (idp.spresso.me). There are also no workarounds in place for the broken Internet Explorer postMessage API.</i></p>
 
     <form onsubmit='startLogin(); return false;'>
-      <input id='email_input' type='email' value='alice@idp.spresso.me' pattern='^.*@idp\.spresso\.me$'>
+      <input id='email_input' type='email' value='alice@idp.spresso.me'>
       <button type='submit'>Login with SPRESSO</button>
     </form>
     <p>
       Available users for this demo:
       <table>
-	<tr>
-	  <th>Username</th>
-	  <th>Password</th>
-	</tr>
-	<tr>
-	  <td>alice@idp.spresso.me</td>
-	  <td>alice</td>
-	</tr>
-	<tr>
-	  <td>bob@idp.spresso.me</td>
-	  <td>bob</td>
-	</tr>
+  <tr>
+    <th>Username</th>
+    <th>Password</th>
+  </tr>
+  <tr>
+    <td>alice@idp.spresso.me</td>
+    <td>alice</td>
+  </tr>
+  <tr>
+    <td>bob@idp.spresso.spresso.me</td>
+    <td>bob</td>
+  </tr>
       </table>
     </p>
     <ul id='log'>
